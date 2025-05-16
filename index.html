@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FELIZ CUMPLE EDU</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #f0f0f0;
+      overflow: hidden; /* Para evitar scroll general */
+    }
+
+    .container {
+      perspective: 1000px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      width: 300px;
+      height: 420px;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.5s ease;
+      cursor: pointer;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      user-select: none; /* Evitar selección de texto al arrastrar */
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    .card img {
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+      position: absolute;
+      backface-visibility: hidden;
+      object-fit: cover;
+      pointer-events: none; /* Para evitar interferir con eventos */
+    }
+
+    .card img.back {
+      transform: rotateY(180deg);
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #2d72d9;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #1b4ea0;
+    }
+
+    .scratch-card {
+      margin-top: 20px;
+      display: none;
+      position: relative;
+      width: 300px;
+      height: 80px;
+      background: #fff;
+      border: 2px solid #ccc;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .message {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 20px;
+      font-weight: bold;
+      color: #000; /* Texto negro */
+      z-index: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+      cursor: pointer;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="card" id="card">
+      <img src="front.jpg" class="front" />
+      <img src="back.jpg" class="back" />
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button id="flipBtn">Girar carta</button>
+    <button id="revealBtn" style="display:none;">Revelar código</button>
+  </div>
+
+  <div class="scratch-card" id="scratchCard">
+    <div class="message">CODE_LOL</div>
+    <canvas id="scratchCanvas"></canvas>
+  </div>
+
+  <script>
+    const card = document.getElementById("card");
+    const flipBtn = document.getElementById("flipBtn");
+    const revealBtn = document.getElementById("revealBtn");
+    const scratchCard = document.getElementById("scratchCard");
+
+    let flipped = false;
+    let isDragging = false;
+
+    flipBtn.addEventListener("click", () => {
+      flipped = !flipped;
+      updateUI();
+      resetTransform();
+    });
+
+    function updateUI() {
+      if (flipped) {
+        revealBtn.style.display = "inline-block";
+      } else {
+        revealBtn.style.display = "none";
+        scratchCard.style.display = "none";
+      }
+    }
+
+    function getBaseTransform() {
+      return `rotateY(${flipped ? 180 : 0}deg)`;
+    }
+
+    function resetTransform() {
+      card.style.transform = getBaseTransform();
+    }
+
+    function applyTilt(clientX, clientY) {
+      const rect = card.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const rotateX = ((y - centerY) / centerY) * 100;
+      const rotateY = ((x - centerX) / centerX) * 100;
+      const baseY = flipped ? 180 : 0;
+
+      card.style.transform = `
+        rotateY(${baseY}deg)
+        rotateX(${-rotateX}deg)
+        rotateZ(${rotateY}deg)
+      `;
+    }
+
+    // PC events
+    card.addEventListener("mousedown", () => { isDragging = true; });
+    card.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      applyTilt(e.clientX, e.clientY);
+    });
+    ["mouseup", "mouseleave"].forEach(event => {
+      card.addEventListener(event, () => {
+        if (isDragging) {
+          isDragging = false;
+          resetTransform();
+        }
+      });
+    });
+
+    // Mobile events with preventDefault to avoid scroll
+    card.addEventListener("touchstart", (e) => { 
+      isDragging = true;
+      e.preventDefault(); 
+    });
+    card.addEventListener("touchmove", (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      applyTilt(touch.clientX, touch.clientY);
+    });
+    card.addEventListener("touchend", () => {
+      isDragging = false;
+      resetTransform();
+    });
+
+    // Mostrar Rasca
+    revealBtn.addEventListener("click", () => {
+      scratchCard.style.display = "block";
+      initScratch();
+    });
+
+    function initScratch() {
+      const canvas = document.getElementById('scratchCanvas');
+      const ctx = canvas.getContext('2d');
+      const width = 300;
+      const height = 80;
+
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx.fillStyle = '#bbb';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.globalCompositeOperation = 'destination-out';
+
+      let isDrawing = false;
+
+      function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.touches ? e.touches[0].clientX : e.clientX;
+        const y = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+          x: x - rect.left,
+          y: y - rect.top
+        };
+      }
+
+      function startDrawing(e) {
+        isDrawing = true;
+        draw(e);
+      }
+
+      function endDrawing() {
+        isDrawing = false;
+        ctx.beginPath();
+      }
+
+      function draw(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 15, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      canvas.addEventListener('mousedown', startDrawing);
+      canvas.addEventListener('mouseup', endDrawing);
+      canvas.addEventListener('mousemove', draw);
+
+      canvas.addEventListener('touchstart', startDrawing);
+      canvas.addEventListener('touchend', endDrawing);
+      canvas.addEventListener('touchmove', draw);
+    }
+
+    resetTransform();
+    updateUI();
+  </script>
+</body>
+</html>
